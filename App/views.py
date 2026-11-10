@@ -1,8 +1,14 @@
 from django.shortcuts import render, redirect
+from django.db.models import F
 from django.contrib import messages
-from django.http import HttpResponse
+from django.http import JsonResponse
+from django.views.decorators.http import require_GET
+from django.forms.models import model_to_dict
+from django.views import View
+# from django.contrib.auth.decorators import login_required
 
 from .models import Cliente, Mecanico, Veiculo, Peca, Orcamento, StatusOrcamento, OrcamentoPeca
+from . import models
 from .forms import ClienteModelForm, MecanicoModelForm, PecaModelForm, VeiculoModelForm, OrcamentoModelForm
 
 tables = {
@@ -31,23 +37,35 @@ nav = [
         {'text':'Orçamentos','url':'orcamentos','icone':'file-text.svg',},
     ]
 
-
+# cliente = Cliente.objects.get(id=pk)
+#     #print(contato)
+#     if request.method == 'POST':
+#         #form = ContatoModelForm(request.POST)
+#         #if form.is_valid():
+#             cliente.delete()
+#             return redirect("clientes")
 def ExcluirRegistro(request, tabela, pk):
-    registro = tables.get(tabela)
     
-    model = registro['model'].objects.get(id=pk)
-    if registro['model'] is None:
+    tabelas = {
+        'Veiculo': Veiculo
+    }
+    modelo = tabelas['Veiculo']
+    
+    registro = modelo.objects.get(id=pk)
+    
+    # model = registro['model'].objects.get(id=pk)
+    if registro is None:
         return redirect('error')
 
     if request.method == 'POST':
-        model.delete()
-        return redirect(registro['url'])
+        registro.delete()
+        return redirect('dashboard')
     
     context = {
-        'titulo':registro['titulo'],
-        'tabela':registro['nome'],
+        'titulo':'teste',
+        'tabela':'teste',
         'descricao':'Confira os dados do registro antes de confirmar a exclusão.',
-        "registro": model
+        "registro": registro
     }
     
     return render(request, "excluir.html", context)
@@ -124,7 +142,7 @@ def altCliente(request, pk):
     }
     return render(request, "cliente/alterar.html", context)
 
-def exCliente(request, pk):
+def exCliente(request, pk, tabela):
 
     cliente = Cliente.objects.get(id=pk)
     #print(contato)
@@ -143,6 +161,22 @@ def exCliente(request, pk):
     return render(request, "cliente/excluir.html", context)
 
 # CRUD DE MECANICOS
+class MecanicosView(View):
+    
+    def get(request, nav = nav, *args, **kwargs):
+        mecanicos = models.Mecanico.objects.all()
+        
+        context = {
+            'titulo': 'Mecanicos',
+            'dados': {
+                'mecanicos': mecanicos,
+            },
+            'tabela': models.Mecanico,
+            'navegacao': nav
+        }
+        return render(request, "mecanico/gerenciamento.html", context)
+        
+        
 def Mecanicos(request, nav = nav):
     
     mecanicos = Mecanico.objects.all()
@@ -191,18 +225,76 @@ def exMecanico(request, pk):
 
     return render(request, "mecanico/excluir.html", context)
 
+@require_GET # Garante que a view só aceite o método HTTP GET
+def filtros_veiculo(request):
+    
+    marca = request.GET.get('marca','')
+    if not marca:
+        return JsonResponse({'status':'erro', 'resultado':[]})
+    else:
+        dados = Veiculo.objects.values('id','placa','modelo',cliente=F('proprietario__nome'),tipo=F('tipo_veiculo__nome'),nome_marca=F('marca__nome')).filter(marca__nome=marca)
+    # total = Veiculo.objects.values().filter(marca__nome=marca)
+    
+    # Usar .values(): retorna um dicionario puro em python
+    # O nome de cada valor do dicionario é igual ao nome das coluna do banco
+    # F() : permite renomear o nome de uma coluna vinda do banco. Funciona como o AS em SQL
+    
+    # list() converte o querySet vindo do models
+    # O json não le dados direto de QuerySet
+    resultados = list(dados)
+
+    return JsonResponse({'status': 'sucesso', 'resultado': resultados})
+
 # CRUD DE VEICULOS
+class VeiculosView(View):
+    
+    def get(self, request, nav = nav, *args, **kwargs):
+        # all() : retorna uma instancia do banco de dados
+        veiculos = Veiculo.objects.all()
+        marcas = models.Marca.objects.all()
+        termo_marca = request.GET.get('marca')
+        
+        # if termo_marca:
+            # veiculos = Veiculo.objects.filter(marca=termo_marca)
+        
+        context = {
+            'titulo': 'Veiculos',
+            'dados': {
+                'veiculos':veiculos,
+                'total_veiculo': Veiculo.objects.count(),
+            },
+            'tabela': Veiculo,
+            'marcas': marcas,
+            'navegacao': nav,
+        }
+        return render(request, "veiculo/gerenciamento.html", context)
+        
+    
+    
 def Veiculos(request, nav = nav):
     
-    dados = Veiculo.objects.all()
+    veiculos = Veiculo.objects.all()
+    marcas = models.Marca.objects.all()
+    get_marca = request.GET.get('marca')
+    # marca = Veiculo.objects.filter(marca='HONDA')
+    total_veiculo = Veiculo.objects.count()
+
+    if get_marca:
+        veiculos = Veiculo.objects.filter(marca__nome=get_marca)
+        total_veiculo = veiculos.count()
+    
     context = {
         'titulo': 'Veiculos',
-        'dados': dados,
+        'dados': {
+            'veiculos':veiculos,
+            'total_veiculo':total_veiculo,
+        },
+        'marcas': marcas,
         'navegacao': nav,
     }
     return render(request, "veiculo/gerenciamento.html", context)
 
-def cadVeiculo(request):
+def cadVeiculo(request, nav = nav):
 
     if request.method == "POST":
         form = VeiculoModelForm(request.POST)
@@ -221,11 +313,12 @@ def cadVeiculo(request):
 
     context = {
         'titulo': 'Veiculos',
-        'form': form
+        'form': form,
+        'nav': nav
     }
     return render(request,"veiculo/cadastrar.html", context)
 
-def altVeiculo(request, pk):
+def altVeiculo(request, pk, nav = nav):
 
     veiculo = Veiculo.objects.get(id=pk)
 
@@ -241,7 +334,8 @@ def altVeiculo(request, pk):
         form = VeiculoModelForm(instance=veiculo)
     context = {
         "form": form,
-        "veiculo": veiculo
+        "veiculo": veiculo,
+        "navegacao": nav
     }
     return render(request, "veiculo/alterar.html", context)
 
@@ -261,7 +355,7 @@ def exVeiculo(request, pk):
             "registro": veiculo
     }
 
-    return render(request, "veiculo/excluir.html", context)
+    return render(request, "excluir.html", context)
 
 # CRUD DE PEÇAS
 def Pecas(request, nav = nav):
