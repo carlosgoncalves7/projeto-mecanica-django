@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="{% static 'css/index.css' %}">
 
     <script type="text/javascript" src="scripts.js"></script>
-    <title>{{ titulo }}</title>
+    <title>{% block title %}Oficina Mecânica {% endblock %}</title>
   </head>
   <body>
     <header class="header-welcome">
