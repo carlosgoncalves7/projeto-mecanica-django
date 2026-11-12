@@ -268,32 +268,6 @@ class VeiculosView(View):
             'navegacao': nav,
         }
         return render(request, "veiculo/gerenciamento.html", context)
-        
-    
-    
-def Veiculos(request, nav = nav):
-    
-    veiculos = Veiculo.objects.all()
-    marcas = models.Marca.objects.all()
-    get_marca = request.GET.get('marca')
-    # marca = Veiculo.objects.filter(marca='HONDA')
-    total_veiculo = Veiculo.objects.count()
-
-    if get_marca:
-        veiculos = Veiculo.objects.filter(marca__nome=get_marca)
-        total_veiculo = veiculos.count()
-    
-    context = {
-        'titulo': 'Veiculos',
-        'dados': {
-            'veiculos':veiculos,
-            'total_veiculo':total_veiculo,
-        },
-        'marcas': marcas,
-        'navegacao': nav,
-    }
-    return render(request, "veiculo/gerenciamento.html", context)
-
 def cadVeiculo(request, nav = nav):
 
     if request.method == "POST":
